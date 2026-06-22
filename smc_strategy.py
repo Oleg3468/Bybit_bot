@@ -610,7 +610,7 @@ class AutoTrader:
 
                 # Дедупликация — не повторять сигнал чаще раз в час
                 last = self._last_signals.get(symbol, 0)
-                if time.time() - last < 3600:
+                if time.time() - last < 900:
                     continue
 
                 self._last_signals[symbol] = time.time()
