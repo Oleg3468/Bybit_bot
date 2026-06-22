@@ -1,0 +1,41 @@
+[
+  {
+    "date": "2026-04-30 13:58",
+    "coin": "ADAUSDT",
+    "direction": "long",
+    "entry": 0.246,
+    "size_usdt": 199.26,
+    "margin": 9.96,
+    "leverage": 20,
+    "take_profit": 0.2486,
+    "stop_loss": 0.2434,
+    "liquidation": 0.2362,
+    "session": "Europe",
+    "result": "open"
+  },
+  {
+    "date": "2026-04-30 18:03",
+    "coin": "ADAUSDT",
+    "direction": "long",
+    "entry": 0.246,
+    "size_usdt": 199.26,
+    "margin": 9.96,
+    "leverage": 20,
+    "take_profit": 0.2486,
+    "stop_loss": 0.2434,
+    "liquidation": 0.2362,
+    "session": "Europe",
+    "result": "open"
+  },
+  {
+    "date": "2026-05-05 07:07",
+    "coin": "ADAUSDT",
+    "direction": "Buy",
+    "entry": 0.2543,
+    "qty": 786,
+    "usdt": 10,
+    "tp": null,
+    "sl": null,
+    "result": "open"
+  }
+]
