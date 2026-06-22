@@ -74,16 +74,32 @@ async def auto_trader_loop(app):
     logger.info("🤖 AutoTrader инициализирован.")
 
     while True:
-        await asyncio.sleep(15 * 60)  # каждые 15 минут
-        if not auto_enabled["enabled"]:
-            continue
-        try:
-            logger.info("🔍 AutoTrader: сканирую рынок...")
-            await trader.scan_once()
-        except Exception as e:
-            logger.error(f"AutoTrader error: {e}")
+        while True:
+            try:
+                if not auto_enabled["enabled"]:
+                    await asyncio.sleep(5)
+                    continue
 
-# ─── ОБРАБОТЧИК СООБЩЕНИЙ ─────────────────────────────────────────────────────
+                logger.info("Scanning market...")
+                signals = await trader.scan_once()
+
+                if not signals:
+                    logger.info("No signals found.")
+                else:
+                    for signal in signals:
+                        try:
+                            result = await trader.execute_signal(signal)
+                            if result.get("ok"):
+                                logger.info(f"Trade opened: {signal.symbol}")
+                            else:
+                                logger.warning(f"Trade failed: {result.get(msg)}")
+                        except Exception as se:
+                            logger.error(f"Signal error: {se}")
+
+            except Exception as e:
+                logger.error(f"AutoTrader error: {e}")
+
+            await asyncio.sleep(15 * 60)
 async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): await deny(update); return
     text  = update.message.text.strip()
