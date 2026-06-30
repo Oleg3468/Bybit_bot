@@ -424,7 +424,7 @@ class SMCStrategy:
 
         # Цена должна быть близко к OB (в пределах 0.5%)
         dist = (price - ob.high) / price
-        if dist > 0.03:
+        if dist > 0.08:
             return None
 
         # OB найден
@@ -468,12 +468,12 @@ class SMCStrategy:
             return None
 
         rr = (tp - entry) / (entry - sl)
-        if rr < 1.5:
+        if rr < 1.0:
             # Попробуем дальнюю цель
             tp = ms.last_hh * 1.005
             rr = (tp - entry) / (entry - sl)
 
-        if rr < 1.5:
+        if rr < 1.0:
             return None
 
         # Доп. подтверждение от индикаторов (не блокирует, только бонус)
@@ -512,7 +512,7 @@ class SMCStrategy:
 
         # Цена должна быть близко к OB
         dist = (ob.low - price) / price
-        if dist > 0.03:
+        if dist > 0.08:
             return None
 
         confidence += 30
@@ -550,11 +550,11 @@ class SMCStrategy:
             return None
 
         rr = (entry - tp) / (sl - entry)
-        if rr < 1.5:
+        if rr < 1.0:
             tp = ms.last_ll * 0.995
             rr = (entry - tp) / (sl - entry)
 
-        if rr < 1.5:
+        if rr < 1.0:
             return None
 
         try:
