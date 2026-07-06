@@ -1,4 +1,1 @@
 .env
-__pycache__/
-*.pyc
-trades.json
