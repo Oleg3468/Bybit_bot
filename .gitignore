@@ -1,1 +1,5 @@
 .env
+trades.db
+trades.json.migrated.bak
+trades.db-wal
+trades.db-shm

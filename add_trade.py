@@ -1,24 +1,22 @@
-import json
-import os
-from datetime import datetime
+"""
+add_trade.py — ручное добавление тестовой сделки в журнал.
+Использует journal.add_trade(), чтобы не создавать несовместимую со схемой запись
+(раньше скрипт писал напрямую в trades.json со своими полями — coin/direction/
+take_profit и т.д., что ломало format_open_trades()/format_stats()).
+"""
+import journal
 
-trade = {
-    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-    "coin": "ADAUSDT",
-    "direction": "long",
-    "entry": 0.246,
-    "size_usdt": 199.26,
-    "margin": 9.96,
-    "leverage": 20,
-    "take_profit": 0.2486,
-    "stop_loss": 0.2434,
-    "liquidation": 0.2362,
-    "session": "Europe",
-    "result": "open"
-}
-
-file = "trades.json"
-trades = json.load(open(file)) if os.path.exists(file) else []
-trades.append(trade)
-json.dump(trades, open(file, "w"), indent=2)
-print("Сделка сохранена!")
+trade = journal.add_trade(
+    symbol="ADAUSDT",
+    side="Buy",
+    entry=0.246,
+    sl=0.2434,
+    tp=0.2486,
+    qty=810,
+    risk_pct=1.0,
+    leverage=20,
+    rr=1.7,
+    mode="demo",
+    session="Europe",
+)
+print("Сделка сохранена:", trade)
