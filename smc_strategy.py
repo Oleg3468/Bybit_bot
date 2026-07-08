@@ -217,7 +217,7 @@ class SMCStrategy:
         if not bull_obs: return None
         ob = max(bull_obs, key=lambda x: x.high)
         dist = (price - ob.high) / price
-        if dist > OB_MAX_DISTANCE_PCT: return None
+        if dist > OB_MAX_DISTANCE_PCT: logger.info(f"{symbol}: OB далеко, dist={dist:.4f}"); return None
         confidence += 30; reasons.append(f"✅ Бычий OB: {ob.low:.4f} - {ob.high:.4f}")
         bull_fvgs = [f for f in fvgs if f.type == "BULLISH" and f.low >= ob.low and f.high <= ob.high * 1.01]
         if bull_fvgs: confidence += 20; reasons.append(f"✅ FVG внутри OB: {bull_fvgs[-1].low:.4f} - {bull_fvgs[-1].high:.4f}")
@@ -231,7 +231,7 @@ class SMCStrategy:
         if tp <= entry or sl >= entry: return None
         rr = (tp - entry) / (entry - sl)
         if rr < MIN_RR: tp = ms.last_hh * BULLISH_TP_FALLBACK_PCT; rr = (tp - entry) / (entry - sl)
-        if rr < MIN_RR: return None
+        if rr < MIN_RR: logger.info(f"{symbol}: RR слишком мал, rr={rr:.2f}"); return None
         try:
             ind = full_indicator_analysis(_candles_to_df(candles_15m))
             if ind["direction"] == "Buy": bonus = min(ind["confidence"] / 5, 10); confidence += bonus; reasons.append(f"✅ Индикаторы: Buy")
@@ -244,7 +244,7 @@ class SMCStrategy:
         if not bear_obs: return None
         ob = min(bear_obs, key=lambda x: x.low)
         dist = (ob.low - price) / price
-        if dist > OB_MAX_DISTANCE_PCT: return None
+        if dist > OB_MAX_DISTANCE_PCT: logger.info(f"{symbol}: OB далеко, dist={dist:.4f}"); return None
         confidence += 30; reasons.append(f"✅ Медвежий OB: {ob.low:.4f} - {ob.high:.4f}")
         bear_fvgs = [f for f in fvgs if f.type == "BEARISH" and f.low >= ob.low * 0.99 and f.high <= ob.high]
         if bear_fvgs: confidence += 20; reasons.append(f"✅ FVG внутри OB: {bear_fvgs[-1].low:.4f} - {bear_fvgs[-1].high:.4f}")
