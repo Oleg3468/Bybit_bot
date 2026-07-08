@@ -3,3 +3,6 @@ trades.db
 trades.json.migrated.bak
 trades.db-wal
 trades.db-shm
+__pycache__/
+*.pyc
+*.log
