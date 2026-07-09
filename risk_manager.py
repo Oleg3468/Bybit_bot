@@ -5,6 +5,7 @@ risk_manager.py v2 — Управление рисками
 фикс маржа 10 USDT, плечо 20x.
 """
 from __future__ import annotations
+from config import MIN_RR
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -125,7 +126,7 @@ def can_open_trade(symbol: str, side: str, entry: float, sl: float = 0.0, tp: fl
     tp_dist = abs(tp - entry)
     rr      = tp_dist / sl_dist if sl_dist > 0 else 0
 
-    if rr < 1.5:
+    if rr < MIN_RR:
         return RiskDecision(allowed=False, reason=f"RR слишком низкий: 1:{rr:.2f} (минимум 1:1.5)")
 
     return RiskDecision(
