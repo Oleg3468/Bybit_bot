@@ -234,7 +234,7 @@ class SMCStrategy:
         if rr < MIN_RR: logger.info(f"{symbol}: RR слишком мал, rr={rr:.2f}"); return None
         try:
             ind = full_indicator_analysis(_candles_to_df(candles_15m))
-            if ind["direction"] == "Buy": bonus = min(ind["confidence"] / 5, 10); confidence += bonus; reasons.append(f"✅ Индикаторы: Buy")
+            if ind["direction"] == "Buy": bonus = min(ind["confidence"] * 100 / 5, 10); confidence += bonus; reasons.append(f"✅ Индикаторы: Buy")
         except Exception as e: logger.warning(f"full_indicator_analysis bullish failed: {e}")
         return SMCSignal(symbol=symbol, side="Buy", entry=entry, sl=sl, tp=tp, rr=round(rr, 2), confidence=min(confidence+10, 100), reasons=reasons, timeframe="15")
 
@@ -258,10 +258,10 @@ class SMCStrategy:
         if tp >= entry or sl <= entry: return None
         rr = (entry - tp) / (sl - entry)
         if rr < MIN_RR: tp = ms.last_ll * BEARISH_TP_FALLBACK_PCT; rr = (entry - tp) / (sl - entry)
-        if rr < MIN_RR: return None
+        if rr < MIN_RR: logger.info(f"{symbol}: RR слишком мал, rr={rr:.2f}"); return None
         try:
             ind = full_indicator_analysis(_candles_to_df(candles_15m))
-            if ind["direction"] == "Sell": bonus = min(ind["confidence"] / 5, 10); confidence += bonus; reasons.append(f"✅ Индикаторы: Sell")
+            if ind["direction"] == "Sell": bonus = min(ind["confidence"] * 100 / 5, 10); confidence += bonus; reasons.append(f"✅ Индикаторы: Sell")
         except Exception as e: logger.warning(f"full_indicator_analysis bearish failed: {e}")
         return SMCSignal(symbol=symbol, side="Sell", entry=entry, sl=sl, tp=tp, rr=round(rr, 2), confidence=min(confidence+10, 100), reasons=reasons, timeframe="15")
 
