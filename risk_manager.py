@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 MARGIN_PER_TRADE = 10.0
 LEVERAGE         = 20
-MAX_TRADES_DAY   = 5
-MAX_LOSSES_DAY   = 2
+MAX_TRADES_DAY   = 9999   # временно для сбора данных ML, вернуть 5 перед реальным счётом
+MAX_LOSSES_DAY   = 9999   # временно для сбора данных ML, вернуть 2 перед реальным счётом
 ROI_TARGET       = 0.35
 
 SYMBOL_PARAMS = {
@@ -44,7 +44,7 @@ def is_asia_session() -> bool:
 
 def is_tradeable_now() -> bool:
     hour = datetime.now(timezone.utc).hour
-    return 7 <= hour < 22
+    return True  # временно: торговля 24/7 для сбора данных ML, вернуть "7 <= hour < 22" перед реальным счётом
 
 def calc_position_qty(symbol: str, entry: float, margin: float = MARGIN_PER_TRADE, leverage: int = LEVERAGE) -> float:
     if entry <= 0:
