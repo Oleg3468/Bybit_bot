@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from trade_engine import BybitEngine
-from risk_manager import can_open_trade, build_trade_plan, MARGIN_PER_TRADE, LEVERAGE
+from risk_manager import can_open_trade, build_trade_plan, MARGIN_PER_TRADE, LEVERAGE, MAX_TRADES_DAY, MAX_LOSSES_DAY
 from journal import add_trade, close_trade, format_open_trades, format_stats, count_trades_today, count_losing_trades_today, daily_net_pnl
 from sessions import format_session_message, check_session_changed, format_session_alert, get_current_session
 from market_context import get_analyzer
@@ -160,7 +160,7 @@ async def handle_auto(update: Update, parts: list):
     cmd2 = parts[1].lower()
     if cmd2 in ("вкл","on","включить","start"):
         auto_enabled["enabled"] = True
-        await update.message.reply_text("🤖 *Автоторговля включена!*\nСканирую каждые 15 минут.\nЛимиты: 5 сделок/день | 2 убытка/день", parse_mode="Markdown")
+        await update.message.reply_text(f"🤖 *Автоторговля включена!*\nСканирую каждые 15 минут.\nЛимиты: {MAX_TRADES_DAY} сделок/день | {MAX_LOSSES_DAY} убытка/день", parse_mode="Markdown")
     elif cmd2 in ("выкл","off","выключить","stop"):
         auto_enabled["enabled"] = False
         await update.message.reply_text("⏸ *Автоторговля выключена*", parse_mode="Markdown")
