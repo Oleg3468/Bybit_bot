@@ -13,6 +13,7 @@ risk_manager.py менять не нужно:
 - индексы по (symbol, status) и (date) — статистика считается без full-scan.
 """
 from __future__ import annotations
+from risk_manager import MAX_TRADES_DAY, MAX_LOSSES_DAY
 
 import logging
 import os
@@ -223,7 +224,7 @@ def format_stats(n: int = 0) -> str:
         f"Средний RR: `1:{avg_rr:.2f}`\n"
         f"{'─'*28}\n"
         f"*Сегодня:*\n"
-        f"Сделок: `{trades_today}/5` | Убытков: `{losses_today}/2`\n"
+        f"Сделок: `{trades_today}/{MAX_TRADES_DAY}` | Убытков: `{losses_today}/{MAX_LOSSES_DAY}`\n"
         f"PnL сегодня: `{today_pnl:+.2f}` USDT\n"
         f"Открытых: `{open_count}`"
     )
