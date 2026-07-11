@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 from trade_engine import BybitEngine
 from risk_manager import can_open_trade, build_trade_plan, MARGIN_PER_TRADE, LEVERAGE, MAX_TRADES_DAY, MAX_LOSSES_DAY
-from journal import add_trade, close_trade, format_open_trades, format_stats, count_trades_today, count_losing_trades_today, daily_net_pnl
+from journal import add_trade, close_trade, format_open_trades, format_stats, count_trades_today, count_losing_trades_today, daily_net_pnl, get_open_trades
 from sessions import format_session_message, check_session_changed, format_session_alert, get_current_session
 from market_context import get_analyzer
 from smc_strategy import AutoTrader
@@ -53,6 +53,48 @@ async def session_watcher(app):
             new_sess = check_session_changed()
             if new_sess: await notify(app, format_session_alert(new_sess))
         except Exception as e: logger.error(f"Session watcher: {e}")
+
+async def reconcile_positions_loop(app):
+    """Сверяет журнал с реальными позициями на Bybit каждые 3 минуты.
+    Раньше сделки, закрытые биржей по SL/TP, навсегда оставались в журнале
+    как OPEN — никто не сообщал боту, что позиция уже закрылась. Эта задача
+    закрывает такой разрыв: если в журнале сделка открыта, а на бирже по
+    этому символу уже нет позиции — значит она закрылась, подтягиваем
+    реальный PnL через get_closed_pnl() и пишем в журнал как положено."""
+    await asyncio.sleep(20)  # дать auto_trader_loop и остальным задачам стартовать первыми
+    while True:
+        try:
+            loop = asyncio.get_event_loop()
+            eng = engine()
+            open_trades = get_open_trades()
+            if open_trades:
+                positions_data = await loop.run_in_executor(None, eng.get_positions)
+                live_symbols = set()
+                if positions_data.get("ok"):
+                    live_symbols = {p["symbol"] for p in positions_data.get("positions", [])}
+
+                for t in open_trades:
+                    sym = t["symbol"]
+                    if sym in live_symbols:
+                        continue  # позиция всё ещё реально открыта на бирже
+
+                    # На бирже позиции больше нет — значит закрылась (SL/TP или вручную)
+                    pnl_data = await loop.run_in_executor(None, partial(eng.get_closed_pnl, sym, 1))
+                    if not pnl_data.get("ok") or not pnl_data.get("records"):
+                        continue  # биржа ещё не зафиксировала запись, попробуем в следующий цикл
+
+                    record = pnl_data["records"][0]
+                    close_price = record["avg_exit_price"] or (eng.get_price(sym) or t["entry"])
+                    pnl = record["closed_pnl"]
+                    closed = close_trade(sym, close_price, pnl, DEPOSIT)
+                    if closed:
+                        emoji = "🟢" if pnl >= 0 else "🔴"
+                        await notify(app, f"{emoji} *Автосверка:* {sym} закрыта биржей\nPnL: `{pnl:+.4f}` USDT | #{closed['id']}")
+                        logger.info(f"🔄 Автосверка: {sym} закрыта, PnL={pnl:+.4f}")
+        except Exception as e:
+            logger.error(f"Reconcile positions error: {e}")
+        await asyncio.sleep(180)
+
 
 async def auto_trader_loop(app):
     while True:
@@ -143,7 +185,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif cmd in ("журнал","journal"): await update.message.reply_text(format_open_trades(), parse_mode="Markdown")
     elif cmd in ("лимиты","limits"):
         t = count_trades_today(); l = count_losing_trades_today(); p = daily_net_pnl()
-        await update.message.reply_text(f"📊 *Дневные лимиты*\n{'─'*28}\nСделок: `{t}/5`\nУбытков: `{l}/2`\n{'🟢' if p>=0 else '🔴'} PnL сегодня: `{p:+.2f}` USDT", parse_mode="Markdown")
+        await update.message.reply_text(f"📊 *Дневные лимиты*\n{'─'*28}\nСделок: `{t}/{MAX_TRADES_DAY}`\nУбытков: `{l}/{MAX_LOSSES_DAY}`\n{'🟢' if p>=0 else '🔴'} PnL сегодня: `{p:+.2f}` USDT", parse_mode="Markdown")
     elif cmd in ("режим","mode") and len(parts) >= 2:
         m = parts[1].lower()
         if m in ("demo","демо"): current_mode["mode"]="demo"; await update.message.reply_text("🧪 Режим: *DEMO*", parse_mode="Markdown")
@@ -199,7 +241,7 @@ async def handle_trade(update: Update, parts: list, side: str):
     trade = add_trade(symbol=sym, side=side, entry=decision.entry, sl=decision.sl, tp=decision.tp, qty=decision.qty, risk_pct=RISK_PCT, leverage=decision.leverage, rr=decision.rr, mode=mode, order_id=result.get("orderId",""), session=sess["name"])
     t, l = count_trades_today(), count_losing_trades_today()
     side_emoji = "🟢 ЛОНГ" if side == "Buy" else "🔴 ШОРТ"
-    await update.message.reply_text(f"✅ *Ордер открыт!* {mode_badge()}\n{'─'*28}\n{side_emoji} *{sym}*\nQty: `{decision.qty}` | Entry: `{decision.entry}`\nSL: `{decision.sl}` | TP: `{decision.tp}`\nRR: `1:{decision.rr:.2f}` | Маржа: `{decision.margin} USDT`\n{sess['emoji']} {sess['name']}\n{'─'*28}\nСделок: `{t}/5` | Убытков: `{l}/2`\n#️⃣ #{trade['id']}", parse_mode="Markdown")
+    await update.message.reply_text(f"✅ *Ордер открыт!* {mode_badge()}\n{'─'*28}\n{side_emoji} *{sym}*\nQty: `{decision.qty}` | Entry: `{decision.entry}`\nSL: `{decision.sl}` | TP: `{decision.tp}`\nRR: `1:{decision.rr:.2f}` | Маржа: `{decision.margin} USDT`\n{sess['emoji']} {sess['name']}\n{'─'*28}\nСделок: `{t}/{MAX_TRADES_DAY}` | Убытков: `{l}/{MAX_LOSSES_DAY}`\n#️⃣ #{trade['id']}", parse_mode="Markdown")
 
 async def handle_close(update: Update, parts: list):
     if len(parts) < 2: await update.message.reply_text("❌ Формат: `закрыть ada`", parse_mode="Markdown"); return
@@ -232,7 +274,7 @@ async def handle_balance(update: Update):
     data = await loop.run_in_executor(None, engine().get_balance)
     if not data["ok"]: await update.message.reply_text(f"❌ {data['msg']}"); return
     sess = get_current_session(); p = daily_net_pnl(); t = count_trades_today(); l = count_losing_trades_today()
-    await update.message.reply_text(f"💼 *Баланс* {mode_badge()}\n{'─'*28}\nЭквити:   `{data['equity']:.2f}` USDT\nДоступно: `{data['available']:.2f}` USDT\nОткр.PnL: `{data['unrealisedPnl']:+.4f}` USDT\n{'─'*28}\nPnL сегодня: `{p:+.2f}` USDT\nСделок: `{t}/5` | Убытков: `{l}/2`\nРежим: {auto_badge()}\n{'─'*28}\n{sess['emoji']} {sess['name']}", parse_mode="Markdown")
+    await update.message.reply_text(f"💼 *Баланс* {mode_badge()}\n{'─'*28}\nЭквити:   `{data['equity']:.2f}` USDT\nДоступно: `{data['available']:.2f}` USDT\nОткр.PnL: `{data['unrealisedPnl']:+.4f}` USDT\n{'─'*28}\nPnL сегодня: `{p:+.2f}` USDT\nСделок: `{t}/{MAX_TRADES_DAY}` | Убытков: `{l}/{MAX_LOSSES_DAY}`\nРежим: {auto_badge()}\n{'─'*28}\n{sess['emoji']} {sess['name']}", parse_mode="Markdown")
 
 async def handle_help(update: Update):
     sess = get_current_session()
@@ -245,6 +287,7 @@ async def start_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def post_init(app):
     asyncio.create_task(session_watcher(app))
     asyncio.create_task(auto_trader_loop(app))
+    asyncio.create_task(reconcile_positions_loop(app))
     logger.info("🚀 Все фоновые задачи запущены.")
 
 def main():

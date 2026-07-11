@@ -59,6 +59,34 @@ class BybitEngine:
         except Exception as exc:
             return {"ok": False, "msg": str(exc)}
 
+    def get_closed_pnl(self, symbol: str, limit: int = 1) -> dict:
+        """Реальный реализованный PnL последних закрытых позиций с биржи.
+        Используется как для авто-сверки (закрыто по SL/TP биржей), так и
+        для команды "закрыть" — раньше эта функция не вызывалась вообще,
+        и в журнал всегда писался фиктивный pnl=0.0."""
+        if not self._client:
+            return self._not_ready()
+        try:
+            response = self._client.get_closed_pnl(category="linear", symbol=symbol, limit=limit)
+            if response.get("retCode") != 0:
+                return {"ok": False, "msg": response.get("retMsg", "Error")}
+            records = response.get("result", {}).get("list", [])
+            if not records:
+                return {"ok": True, "records": []}
+            parsed = [
+                {
+                    "symbol": r.get("symbol", ""),
+                    "side": r.get("side", ""),
+                    "closed_pnl": float(r.get("closedPnl", 0)),
+                    "avg_exit_price": float(r.get("avgExitPrice", 0)),
+                    "updated_time": int(r.get("updatedTime", 0)),
+                }
+                for r in records
+            ]
+            return {"ok": True, "records": parsed}
+        except Exception as exc:
+            return {"ok": False, "msg": str(exc)}
+
     def get_positions(self, symbol: str = "") -> dict:
         if not self._client:
             return self._not_ready()
@@ -158,7 +186,13 @@ class BybitEngine:
                 reduceOnly=True,
             )
             if response.get("retCode") == 0:
-                return {"ok": True, "closed_pnl": 0.0, "msg": "Closed"}
+                import time
+                time.sleep(1.5)  # дать бирже время зафиксировать closed-pnl запись
+                pnl_data = self.get_closed_pnl(symbol, limit=1)
+                closed_pnl = 0.0
+                if pnl_data.get("ok") and pnl_data.get("records"):
+                    closed_pnl = pnl_data["records"][0]["closed_pnl"]
+                return {"ok": True, "closed_pnl": closed_pnl, "msg": "Closed"}
             return {"ok": False, "msg": response.get("retMsg", "Error")}
         except Exception as exc:
             return {"ok": False, "msg": str(exc)}

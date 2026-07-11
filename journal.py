@@ -164,6 +164,17 @@ def close_trade(symbol: str, close_price: float, pnl: float, deposit: float = 10
     return trade
 
 
+def get_open_trades() -> list:
+    """Сырые данные открытых сделок (список dict), в отличие от format_open_trades()
+    которая возвращает готовый текст для Telegram. Нужно для автосверки с биржей —
+    без этого не с чем сравнивать реальные позиции Bybit."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM trades WHERE status='OPEN' ORDER BY id"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def format_open_trades() -> str:
     with _conn() as conn:
         trades = conn.execute(
