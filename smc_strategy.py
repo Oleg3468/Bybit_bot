@@ -278,9 +278,18 @@ class AutoTrader:
         self._last_signals: dict = {}
 
     async def scan_once(self) -> list[SMCSignal]:
+        from journal import get_open_trades
         signals, loop = [], asyncio.get_event_loop()
+        # Раньше тут не было проверки на уже открытую позицию по символу —
+        # каждые 15 минут стратегия могла найти "новый" сигнал по монете,
+        # которая уже открыта, и добавляла ещё одну дублирующую запись в
+        # журнал. На бирже позиция всё равно одна (нетбинг), а в журнале
+        # копились десятки дублей на один и тот же символ.
+        already_open_symbols = {t["symbol"] for t in get_open_trades()}
         for symbol in self.SYMBOLS:
             try:
+                if symbol in already_open_symbols:
+                    continue
                 signal = await loop.run_in_executor(None, self.strategy.analyze, symbol)
                 if not signal or not signal.is_valid: continue
                 last = self._last_signals.get(symbol, 0)
