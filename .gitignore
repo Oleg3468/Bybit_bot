@@ -6,3 +6,6 @@ trades.db-shm
 __pycache__/
 *.pyc
 *.log
+run_forever.sh
+trades.db.backup_before_dedup
+price]
