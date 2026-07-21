@@ -171,6 +171,81 @@ def find_liquidity_levels(candles: list[Candle]) -> dict:
         "prev_low":  min(lows[-50:-20])  if len(lows)  > 20 else min(lows),
     }
 
+MTF_TIMEFRAMES = [("1D", "D"), ("4H", "240"), ("1H", "60"), ("15m", "15")]
+
+@dataclass
+class MTFPanel:
+    symbol:        str
+    trends:        dict
+    alignment:     str
+    aligned_count: int
+    total_count:   int
+
+    def format(self) -> str:
+        icon = {"BULLISH": "🟢", "BEARISH": "🔴", "NEUTRAL": "⚪", "NO_DATA": "❔"}
+        lines = [f"📐 *MTF-панель* {self.symbol}", "─" * 28]
+        for label, trend in self.trends.items():
+            lines.append(f"{icon.get(trend, '❔')} {label}: `{trend}`")
+        lines.append("─" * 28)
+        alignment_text = {
+            "STRONG_BULLISH": "🔥 Полная синхронизация: BULLISH",
+            "STRONG_BEARISH": "🔥 Полная синхронизация: BEARISH",
+            "LEAN_BULLISH":   f"⚖️ Перевес BULLISH ({self.aligned_count}/{self.total_count})",
+            "LEAN_BEARISH":   f"⚖️ Перевес BEARISH ({self.aligned_count}/{self.total_count})",
+            "MIXED":          "⚠️ Разнонаправлено — синхронизации нет",
+            "NO_DATA":        "❔ Недостаточно данных",
+        }
+        lines.append(alignment_text.get(self.alignment, self.alignment))
+        lines.append("")
+        lines.append("_Справочная панель. Не влияет на confidence сигналов._")
+        return "\n".join(lines)
+
+def get_mtf_panel(engine_fn, symbol: str) -> MTFPanel:
+    """
+    Считает тренд (по той же логике, что и analyze_market_structure)
+    на 4 таймфреймах: 1D, 4H, 1H, 15m — и оценивает их согласованность.
+    Чисто диагностическая функция, в скоринг сигналов НЕ встроена.
+    """
+    trends = {}
+    for label, interval in MTF_TIMEFRAMES:
+        try:
+            raw = engine_fn().get_klines(symbol, interval=interval, limit=100)
+            candles = [Candle(**c) for c in raw]
+            if len(candles) < 20:
+                trends[label] = "NO_DATA"
+                continue
+            ms = analyze_market_structure(candles)
+            trends[label] = ms.trend
+        except Exception as e:
+            logger.warning(f"MTF panel {symbol} {label}: {e}")
+            trends[label] = "NO_DATA"
+
+    valid = [t for t in trends.values() if t != "NO_DATA"]
+    bulls = sum(1 for t in valid if t == "BULLISH")
+    bears = sum(1 for t in valid if t == "BEARISH")
+    total = len(valid)
+
+    if total == 0:
+        alignment = "NO_DATA"
+    elif bulls == total:
+        alignment = "STRONG_BULLISH"
+    elif bears == total:
+        alignment = "STRONG_BEARISH"
+    elif bulls > bears:
+        alignment = "LEAN_BULLISH"
+    elif bears > bulls:
+        alignment = "LEAN_BEARISH"
+    else:
+        alignment = "MIXED"
+
+    return MTFPanel(
+        symbol=symbol,
+        trends=trends,
+        alignment=alignment,
+        aligned_count=max(bulls, bears),
+        total_count=total,
+    )
+
 class SMCStrategy:
     def __init__(self, engine_fn, deposit: float, risk_pct: float, leverage: int):
         self.engine_fn = engine_fn

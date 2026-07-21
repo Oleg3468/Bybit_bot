@@ -9,7 +9,7 @@ from risk_manager import can_open_trade, build_trade_plan, MARGIN_PER_TRADE, LEV
 from journal import add_trade, close_trade, format_open_trades, format_stats, count_trades_today, count_losing_trades_today, daily_net_pnl, get_open_trades
 from sessions import format_session_message, check_session_changed, format_session_alert, get_current_session
 from market_context import get_analyzer
-from smc_strategy import AutoTrader
+from smc_strategy import AutoTrader, get_mtf_panel
 from config import SCAN_INTERVAL_SEC, IDLE_POLL_SEC
 
 load_dotenv()
@@ -174,6 +174,14 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⏳ Анализирую...")
         try: await update.message.reply_text(market_ctx.format_summary(sym), parse_mode="Markdown")
         except Exception as e: await update.message.reply_text(f"❌ {e}")
+    elif cmd in ("мтф","mtf"):
+        sym = parse_symbol(parts[1]) if len(parts) > 1 else "BTCUSDT"
+        await update.message.reply_text("⏳ Считаю MTF-панель...")
+        try:
+            panel = await loop.run_in_executor(None, get_mtf_panel, engine, sym)
+            await update.message.reply_text(panel.format(), parse_mode="Markdown")
+        except Exception as e:
+            await update.message.reply_text(f"❌ {e}")
     elif cmd in ("фандинг","funding"):
         sym  = parse_symbol(parts[1]) if len(parts) > 1 else "BTCUSDT"
         rate = await loop.run_in_executor(None, engine().get_funding_rate, sym)
@@ -278,7 +286,7 @@ async def handle_balance(update: Update):
 
 async def handle_help(update: Update):
     sess = get_current_session()
-    await update.message.reply_text(f"🤖 *SMC Trade Bot v4* {mode_badge()}\n{'─'*32}\n\n*🤖 Автоторговля:*\n`авто вкл` — включить\n`авто выкл` — выключить\n`авто скан` — ручной скан\n\n*📈 Торговля:*\n`лонг ada`\n`шорт sol 145 142 155`\n`закрыть ada`\n\n*📊 Анализ:*\n`контекст` | `сессия` | `фандинг btc`\n\n*💼 Портфель:*\n`баланс` | `позиции` | `лимиты`\n\n*⚙️ Настройки:*\n`режим demo` / `режим live`\n\n{'─'*32}\nМаржа: `{MARGIN_PER_TRADE} USDT` | Плечо: `{LEVERAGE}x`\n{sess['emoji']} {sess['name']}", parse_mode="Markdown")
+    await update.message.reply_text(f"🤖 *SMC Trade Bot v4* {mode_badge()}\n{'─'*32}\n\n*🤖 Автоторговля:*\n`авто вкл` — включить\n`авто выкл` — выключить\n`авто скан` — ручной скан\n\n*📈 Торговля:*\n`лонг ada`\n`шорт sol 145 142 155`\n`закрыть ada`\n\n*📊 Анализ:*\n`контекст` | `сессия` | `фандинг btc` | `мтф btc`\n\n*💼 Портфель:*\n`баланс` | `позиции` | `лимиты`\n\n*⚙️ Настройки:*\n`режим demo` / `режим live`\n\n{'─'*32}\nМаржа: `{MARGIN_PER_TRADE} USDT` | Плечо: `{LEVERAGE}x`\n{sess['emoji']} {sess['name']}", parse_mode="Markdown")
 
 async def start_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): await deny(update); return
