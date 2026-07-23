@@ -163,7 +163,7 @@ async def handle_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         entry = float(parts[3]) if len(parts) > 3 else (engine().get_price(sym) or 0)
         sl    = float(parts[4]) if len(parts) > 4 else 0.0
         tp    = float(parts[5]) if len(parts) > 5 else 0.0
-        d     = build_trade_plan(sym, side, entry, sl, tp)
+        d     = build_trade_plan(sym, side, entry, sl, tp, DEPOSIT, RISK_PCT, LEVERAGE)
         await update.message.reply_text(d.format(), parse_mode="Markdown")
     elif cmd in ("авто","auto"): await handle_auto(update, parts)
     elif cmd in ("сессия","session"):
@@ -236,7 +236,7 @@ async def handle_trade(update: Update, parts: list, side: str):
     sl = float(parts[3]) if len(parts) > 3 else 0.0
     tp = float(parts[4]) if len(parts) > 4 else 0.0
 
-    decision = can_open_trade(sym, side, entry, sl, tp)
+    decision = can_open_trade(sym, side, entry, sl, tp, DEPOSIT, RISK_PCT, LEVERAGE)
     if not decision.allowed: await update.message.reply_text(decision.format(), parse_mode="Markdown"); return
 
     await update.message.reply_text(decision.format(), parse_mode="Markdown")
